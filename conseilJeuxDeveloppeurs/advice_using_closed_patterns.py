@@ -25,6 +25,11 @@
 import os
 import csv
 
+print_key = input("Voulez-vous afficher les détails des étapes de l'algorithme (o/n) ? \n")
+if (print_key == "n"):
+    printing = False
+else:
+    printing = True
 # os.system('python3 generate_data.py')
 
 # Maintenant que notre dataset a été généré, nous pouvons le charger.
@@ -47,13 +52,13 @@ with open('DATA/data_output.csv', mode='r') as infile:
                 elt[columns_keys[index]] = row[index]
 
             # Ici, on filtre les données
-            if int(elt["Year"]) >= 2012:
+            if int(elt["Year"]) >= 2000:
                 data.append(elt)
-
-print("\n=================================================================\n")
-print("    Affichage du dataset : ")
-print("\n=================================================================\n")
-print(data)
+if (printing):
+    print("\n=================================================================\n")
+    print("    Affichage du dataset : ")
+    print("\n=================================================================\n")
+    print(data)
 
 
 ## II - Analyse en utilisant les fréquents et fermés.
@@ -89,33 +94,57 @@ def getMotifs(line):
 # Nous pouvons désormais parcourir notre dataset pour compter les suport des motifs présent dans notre dataset.
 # Nous effectuons un tris sur les colones, car certaines informations ne sont pas pertinentes pour l'objectif que nous
 # recherchons
-
-variables_to_use = ["Platform", "Genre", "Year"]
-frequents = {}
-for row_index, row in enumerate(data):
-    complete_pattern = []
-    for variable_key in variables_to_use:
-        complete_pattern.append(row[variable_key])
-    motifs = getMotifs(complete_pattern)  # remode globals sales that will be our value
-    global_sales = row["Global_Sales"]
-
-    for motif in motifs:
-        key = tuple(motif)
-        if key not in frequents:
-            frequents[key] = {
-                "total_sales": float(global_sales),
-                "index_apparitions": [row_index],
-                "support": 1
-            }
+def frequency_search(level_allowed):
+    annee = 0
+    if level_allowed == 3:
+        variables_to_use = ["Platform", "Genre", "Year"]
+        annee_input = input("Quelle année (2012-2016) voulez vous étudier ? \n")
+        if(int(annee_input) < 2000 or int(annee_input) >  2016):
+            annee = 2014
         else:
-            frequents[key]["total_sales"] += float(global_sales)
-            frequents[key]["support"] += 1
-            frequents[key]["index_apparitions"].append(row_index)
+            annee = int(annee_input)
+    elif level_allowed == 2:
+        variables_to_use = ["Platform", "Genre"]
+    else:
+        variables_to_use = ["Genre"]
+    frequents = {}
+    for row_index, row in enumerate(data):
+        complete_pattern = []
+        for variable_key in variables_to_use:
+            if variable_key == "Year" :
+                if row[variable_key] == str(annee):
+                    complete_pattern.append(row[variable_key])
+            else:
+                complete_pattern.append(row[variable_key])
+        motifs = getMotifs(complete_pattern)  # remode globals sales that will be our value
+        global_sales = row["Global_Sales"]
+
+        for motif in motifs:
+            key = tuple(motif)
+            if key not in frequents:
+                frequents[key] = {
+                    "total_sales": float(global_sales),
+                    "index_apparitions": [row_index],
+                    "support": 1
+                }
+            else:
+                frequents[key]["total_sales"] += float(global_sales)
+                frequents[key]["support"] += 1
+                frequents[key]["index_apparitions"].append(row_index)
+    return frequents
+
+level = input("Quelle combinaison de paramètres attendez vous : \n"
+              "1 - Genre \n"
+              "2 - Genre + Plateforme \n"
+              "3 - Genre + Plateforme + Année \n")
+frequents = frequency_search(int(level))
 
 # Filtrage des fréquents
 minsup = 20
 filtered_frequents = []  # Nous créons une liste afin de pouvoir la filtrer
 for motif, content in frequents.items():
+    if len(motif) != int(level):
+        continue
     if content["support"] >= minsup:
         frequent = {
             "motif": motif,
@@ -125,44 +154,54 @@ for motif, content in frequents.items():
             "support": frequents[motif]["support"]
         }
         filtered_frequents.append(frequent)
-print("\n=================================================================\n")
-print("    Affichage de " + str(len(filtered_frequents)) + " fréquents")
-print("\n=================================================================\n")
-for frequent in filtered_frequents:
-    print(
-        "Motif: " + str(frequent["motif"])
-        + ", average_sales: " + str(frequent["average_sales"])
-        + ", support: " + str(frequent["support"]))
+if (printing):
+    print("\n=================================================================\n")
+    print("    Affichage de " + str(len(filtered_frequents)) + " fréquents")
+    print("\n=================================================================\n")
+    for frequent in filtered_frequents:
+        print(
+            "Motif: " + str(frequent["motif"])
+            + ", average_sales: " + str(frequent["average_sales"] * 1000)
+            + " k , support: " + str(frequent["support"]))
 
 # Maintenant que nous avons trouvé les fréquents, nous pouvons chercher les fermés, afin d'avoir un maximum
 # d'informations sur les motifs que nous sélectionnons.
 
-print("recherche de fermés ... \n")
+if (printing):
+    print("recherche de fermés ... \n")
 closed_patterns = filtered_frequents.copy()
 for motif in filtered_frequents:
     for potential_closure in filtered_frequents:
         if motif["index_apparitions"] == potential_closure["index_apparitions"] \
                 and len(motif["motif"]) < len(potential_closure["motif"]):
             closed_patterns.remove(motif)
-
-print("\n=================================================================\n")
-print("    Affichage de " + str(len(closed_patterns)) + " fermés")
-print("\n=================================================================\n")
-for closed_pattern in closed_patterns:
-    print(
-        "Motif: " + str(closed_pattern["motif"])
-        + ", average_sales: " + str(closed_pattern["average_sales"])
-        + ", support: " + str(closed_pattern["support"]))
+if (printing):
+    print("\n=================================================================\n")
+    print("    Affichage de " + str(len(closed_patterns)) + " fermés")
+    print("\n=================================================================\n")
+    for closed_pattern in closed_patterns:
+        print(
+            "Motif: " + str(closed_pattern["motif"])
+            + ", average_sales: " + str(closed_pattern["average_sales"] * 1000) + " k "
+            + ", support: " + str(closed_pattern["support"]))
 # Maintenant que nous avons des fréquents, nous pouvons les triers pour trouver ceux qui peuvent intéresser les
 # développeurs de jeux vidéos, c'est à dire, les motifs de jeux qui se vendent le mieux
-
-print("\n=================================================================\n")
-print("    Affichage des fermés triés")
-print("\n=================================================================\n")
-
 closed_patterns.sort(key=lambda frequent: frequent["average_sales"], reverse=True)
+if (printing):
+    print("\n=================================================================\n")
+    print("    Affichage des fermés triés")
+    print("\n=================================================================\n")
 
-for frequent in closed_patterns:
+
+    for frequent in closed_patterns:
+        print(
+            "Motif: " + str(frequent["motif"]) + ", average_sales: " + str(
+                frequent["average_sales"] * 1000) + " k " + ", support: " + str(
+                frequent["support"]))
+rank = input("Combien voulez vous afficher de combinaisons parmis les plus vendues ? \n")
+print("Les combinaisons les plus vendues sont : \n ")
+for frequent in closed_patterns[:int(rank)]:
     print(
-        "Motif: " + str(frequent["motif"]) + ", average_sales: " + str(frequent["average_sales"]) + ", support: " + str(
-            frequent["support"]))
+        "Combinaison : " + str(frequent["motif"]) + "\n ventes moyennes : " + str(round(
+            frequent["average_sales"] , 2)) + " millions " + "\n nombre de jeux sortis : " + str(round(
+            frequent["support"], 2)))
